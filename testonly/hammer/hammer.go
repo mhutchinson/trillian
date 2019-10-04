@@ -268,8 +268,6 @@ type mapWorker struct {
 	mapID int64
 	label string
 
-	bias MapBias // Each worker can have its own customized map bias.
-
 	retryErrors       bool
 	operationDeadline time.Duration
 }
@@ -279,7 +277,6 @@ func newWorker(cfg *MapConfig, prng *rand.Rand) *mapWorker {
 		prng:              prng,
 		mapID:             cfg.MapID,
 		label:             strconv.FormatInt(cfg.MapID, 10),
-		bias:              cfg.EPBias,
 		retryErrors:       cfg.RetryErrors,
 		operationDeadline: cfg.OperationDeadline,
 	}
@@ -289,17 +286,43 @@ func newWorker(cfg *MapConfig, prng *rand.Rand) *mapWorker {
 type readWorker struct {
 	*mapWorker
 
+	bias MapBias // Each worker can have its own customized map bias.
+
 	validReadOps   *validReadOps
 	invalidReadOps *invalidReadOps
 }
 
 func newReadWorker(s *hammerState, idx int) *readWorker {
+	readOnlyBias := s.cfg.EPBias
+	readOnlyBias.Bias[SetLeavesName] = 0
 	return &readWorker{
 		mapWorker: newWorker(s.cfg, rand.New(rand.NewSource(int64(idx)))),
 
+		bias:           readOnlyBias,
 		validReadOps:   s.validReadOps,
 		invalidReadOps: s.invalidReadOps,
 	}
+}
+
+func (w *readWorker) readOnce(ctx context.Context) (err error) {
+	ep := w.bias.choose(w.prng)
+	if w.bias.invalid(ep, w.prng) {
+		glog.V(3).Infof("%d: perform invalid %s operation", w.mapID, ep)
+		invalidReqs.Inc(w.label, string(ep))
+		op, err := getOp(ep, w.invalidReadOps)
+		if err != nil {
+			return err
+		}
+		return op(ctx, w.prng)
+	}
+
+	op, err := getOp(ep, w.validReadOps)
+	if err != nil {
+		return err
+	}
+
+	glog.V(3).Infof("%d: perform %s operation", w.mapID, ep)
+	return w.retryOp(ctx, op, string(ep))
 }
 
 func (w *readWorker) loopUntilDone(ctx context.Context, done <-chan struct{}) error {
@@ -309,7 +332,7 @@ func (w *readWorker) loopUntilDone(ctx context.Context, done <-chan struct{}) er
 			return nil
 		default:
 		}
-		if err := w.validReadOps.getLeavesRev(ctx, w.prng); err != nil {
+		if err := w.readOnce(ctx); err != nil {
 			if _, ok := err.(errSkip); ok {
 				continue
 			}
@@ -322,7 +345,9 @@ func (w *readWorker) loopUntilDone(ctx context.Context, done <-chan struct{}) er
 type writeWorker struct {
 	*mapWorker
 
-	operations uint64
+	writeRevisions uint64
+	invalidChance  int
+	opName         string
 
 	// TODO(mhutchinson): Remove hammerState from here - it allows access to global info
 	// which makes reasoning about the behaviour difficult.
@@ -330,24 +355,46 @@ type writeWorker struct {
 }
 
 func newWriteWorker(s *hammerState) *writeWorker {
+	chance := s.cfg.EPBias.InvalidChance[SetLeavesName]
 	return &writeWorker{
 		mapWorker: newWorker(s.cfg, rand.New(s.cfg.RandSource)),
 
-		operations: s.cfg.Operations,
-		s:          s,
+		// How many write revisions to attempt.
+		writeRevisions: s.cfg.Operations,
+		invalidChance:  chance,
+		opName:         string(SetLeavesName),
+		s:              s,
 	}
+}
+
+func (w *writeWorker) selectInvalid() bool {
+	if w.invalidChance <= 0 {
+		return false
+	}
+	return w.prng.Intn(w.invalidChance) == 0
+}
+
+func (w *writeWorker) writeOnce(ctx context.Context) error {
+	if w.selectInvalid() {
+		glog.V(3).Infof("%d: perform invalid write", w.mapID)
+		invalidReqs.Inc(w.label, w.opName)
+		return w.s.setLeavesInvalid(ctx, w.prng)
+	}
+
+	glog.V(3).Infof("%d: perform write", w.mapID)
+	return w.retryOp(ctx, w.s.setLeaves, w.opName)
 }
 
 func (w *writeWorker) loop(ctx context.Context, done <-chan struct{}) (uint64, error) {
 	count := uint64(0)
 
-	for ; count < w.operations; count++ {
+	for ; count < w.writeRevisions; count++ {
 		select {
 		case <-done:
 			return count, nil
 		default:
 		}
-		if err := w.retryOneOp(ctx, w.s); err != nil {
+		if err := w.writeOnce(ctx); err != nil {
 			return count, err
 		}
 	}
@@ -479,27 +526,6 @@ func pickIntInRange(min, max int, prng *rand.Rand) int {
 	return min + prng.Intn(delta)
 }
 
-func (w *mapWorker) retryOneOp(ctx context.Context, s *hammerState) (err error) {
-	ep := w.bias.choose(w.prng)
-	if w.bias.invalid(ep, w.prng) {
-		glog.V(3).Infof("%d: perform invalid %s operation", w.mapID, ep)
-		invalidReqs.Inc(w.label, string(ep))
-		op, err := getOp(ep, s.invalidReadOps, s.setLeavesInvalid)
-		if err != nil {
-			return err
-		}
-		return op(ctx, w.prng)
-	}
-
-	op, err := getOp(ep, s.validReadOps, s.setLeaves)
-	if err != nil {
-		return err
-	}
-
-	glog.V(3).Infof("%d: perform %s operation", w.mapID, ep)
-	return w.retryOp(ctx, op, string(ep))
-}
-
 func (w *mapWorker) retryOp(ctx context.Context, fn mapOperationFn, opName string) error {
 	defer func(start time.Time) {
 		rspLatency.Observe(time.Since(start).Seconds(), w.label, opName)
@@ -564,7 +590,7 @@ type readOps interface {
 
 type mapOperationFn func(context.Context, *rand.Rand) error
 
-func getOp(ep MapEntrypointName, read readOps, write mapOperationFn) (mapOperationFn, error) {
+func getOp(ep MapEntrypointName, read readOps) (mapOperationFn, error) {
 	switch ep {
 	case GetLeavesName:
 		return read.getLeaves, nil
@@ -574,9 +600,6 @@ func getOp(ep MapEntrypointName, read readOps, write mapOperationFn) (mapOperati
 		return read.getSMR, nil
 	case GetSMRRevName:
 		return read.getSMRRev, nil
-	case SetLeavesName:
-		// TODO(mhutchinson): This mutation method needs to be removed from here.
-		return write, nil
 	default:
 		return nil, fmt.Errorf("internal error: unknown operation %s", ep)
 	}
