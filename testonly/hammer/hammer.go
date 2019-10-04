@@ -304,6 +304,22 @@ func newReadWorker(s *hammerState, idx int) *readWorker {
 	}
 }
 
+func (w *readWorker) loopUntilDone(ctx context.Context, done <-chan struct{}) error {
+	for {
+		select {
+		case <-done:
+			return nil
+		default:
+		}
+		if err := w.readOnce(ctx); err != nil {
+			if _, ok := err.(errSkip); ok {
+				continue
+			}
+			return err
+		}
+	}
+}
+
 func (w *readWorker) readOnce(ctx context.Context) (err error) {
 	ep := w.bias.choose(w.prng)
 	if w.bias.invalid(ep, w.prng) {
@@ -321,24 +337,8 @@ func (w *readWorker) readOnce(ctx context.Context) (err error) {
 		return err
 	}
 
-	glog.V(3).Infof("%d: perform %s operation", w.mapID, ep)
+	glog.V(2).Infof("%d: perform %s operation", w.mapID, ep)
 	return w.retryOp(ctx, op, string(ep))
-}
-
-func (w *readWorker) loopUntilDone(ctx context.Context, done <-chan struct{}) error {
-	for {
-		select {
-		case <-done:
-			return nil
-		default:
-		}
-		if err := w.readOnce(ctx); err != nil {
-			if _, ok := err.(errSkip); ok {
-				continue
-			}
-			return err
-		}
-	}
 }
 
 // writeWorker performs mutation operations on a fixed map.
@@ -367,24 +367,6 @@ func newWriteWorker(s *hammerState) *writeWorker {
 	}
 }
 
-func (w *writeWorker) selectInvalid() bool {
-	if w.invalidChance <= 0 {
-		return false
-	}
-	return w.prng.Intn(w.invalidChance) == 0
-}
-
-func (w *writeWorker) writeOnce(ctx context.Context) error {
-	if w.selectInvalid() {
-		glog.V(3).Infof("%d: perform invalid write", w.mapID)
-		invalidReqs.Inc(w.label, w.opName)
-		return w.s.setLeavesInvalid(ctx, w.prng)
-	}
-
-	glog.V(3).Infof("%d: perform write", w.mapID)
-	return w.retryOp(ctx, w.s.setLeaves, w.opName)
-}
-
 func (w *writeWorker) loop(ctx context.Context, done <-chan struct{}) (uint64, error) {
 	count := uint64(0)
 
@@ -399,6 +381,22 @@ func (w *writeWorker) loop(ctx context.Context, done <-chan struct{}) (uint64, e
 		}
 	}
 	return count, nil
+}
+
+func (w *writeWorker) writeOnce(ctx context.Context) error {
+	invalid := false
+	if w.invalidChance > 0 {
+		invalid = w.prng.Intn(w.invalidChance) == 0
+	}
+
+	if invalid {
+		glog.V(3).Infof("%d: perform invalid write", w.mapID)
+		invalidReqs.Inc(w.label, w.opName)
+		return w.s.setLeavesInvalid(ctx, w.prng)
+	}
+
+	glog.V(3).Infof("%d: perform write", w.mapID)
+	return w.retryOp(ctx, w.s.setLeaves, w.opName)
 }
 
 // hammerState tracks the operations that have been performed during a test run.
