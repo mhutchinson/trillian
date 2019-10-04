@@ -208,8 +208,9 @@ func HitMap(ctx context.Context, cfg MapConfig) error {
 		wg.Add(1)
 		go func(i int) {
 			defer wg.Done()
+			w := newReadWorker(s, i)
 			glog.Infof("%d: start checker %d", s.cfg.MapID, i)
-			err := s.readChecker(ctx, done, i)
+			err := w.readChecker(ctx, done)
 			if err != nil {
 				errs <- err
 			}
@@ -281,6 +282,41 @@ func newWorker(cfg *MapConfig, prng *rand.Rand) *mapWorker {
 		bias:              cfg.EPBias,
 		retryErrors:       cfg.RetryErrors,
 		operationDeadline: cfg.OperationDeadline,
+	}
+}
+
+// readWorker can perform only read-only operations on a fixed map.
+type readWorker struct {
+	*mapWorker
+
+	validReadOps   *validReadOps
+	invalidReadOps *invalidReadOps
+}
+
+func newReadWorker(s *hammerState, idx int) *readWorker {
+	return &readWorker{
+		mapWorker: newWorker(s.cfg, rand.New(rand.NewSource(int64(idx)))),
+
+		validReadOps:   s.validReadOps,
+		invalidReadOps: s.invalidReadOps,
+	}
+}
+
+// readChecker loops performing (read-only) checking operations until the done
+// channel is closed.
+func (w *readWorker) readChecker(ctx context.Context, done <-chan struct{}) error {
+	for {
+		select {
+		case <-done:
+			return nil
+		default:
+		}
+		if err := w.validReadOps.getLeavesRev(ctx, w.prng); err != nil {
+			if _, ok := err.(errSkip); ok {
+				continue
+			}
+			return err
+		}
 	}
 }
 
@@ -378,26 +414,6 @@ func (w *mapWorker) performOperations(ctx context.Context, done <-chan struct{},
 		}
 	}
 	return count, nil
-}
-
-// readChecker loops performing (read-only) checking operations until the done
-// channel is closed.
-func (s *hammerState) readChecker(ctx context.Context, done <-chan struct{}, idx int) error {
-	// Use a separate rand.Source so the main goroutine stays predictable.
-	prng := rand.New(rand.NewSource(int64(idx)))
-	for {
-		select {
-		case <-done:
-			return nil
-		default:
-		}
-		if err := s.validReadOps.getLeavesRev(ctx, prng); err != nil {
-			if _, ok := err.(errSkip); ok {
-				continue
-			}
-			return err
-		}
-	}
 }
 
 func (s *hammerState) nextKey() string {
