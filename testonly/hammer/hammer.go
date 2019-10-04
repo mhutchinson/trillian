@@ -210,7 +210,7 @@ func HitMap(ctx context.Context, cfg MapConfig) error {
 			defer wg.Done()
 			w := newReadWorker(s, i)
 			glog.Infof("%d: start checker %d", s.cfg.MapID, i)
-			err := w.readChecker(ctx, done)
+			err := w.loopUntilDone(ctx, done)
 			if err != nil {
 				errs <- err
 			}
@@ -302,9 +302,7 @@ func newReadWorker(s *hammerState, idx int) *readWorker {
 	}
 }
 
-// readChecker loops performing (read-only) checking operations until the done
-// channel is closed.
-func (w *readWorker) readChecker(ctx context.Context, done <-chan struct{}) error {
+func (w *readWorker) loopUntilDone(ctx context.Context, done <-chan struct{}) error {
 	for {
 		select {
 		case <-done:
