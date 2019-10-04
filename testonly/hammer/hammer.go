@@ -221,9 +221,9 @@ func HitMap(ctx context.Context, cfg MapConfig) error {
 	wg.Add(1)
 	go func() {
 		defer wg.Done()
-		w := newWorker(&cfg, rand.New(cfg.RandSource))
+		w := newWriteWorker(s)
 		glog.Infof("%d: start main goroutine", cfg.MapID)
-		count, err := w.performOperations(ctx, done, s)
+		count, err := w.loop(ctx, done)
 		errs <- err // may be nil for the main goroutine completion
 		glog.Infof("%d: performed %d operations on map", cfg.MapID, count)
 	}()
@@ -318,6 +318,42 @@ func (w *readWorker) loopUntilDone(ctx context.Context, done <-chan struct{}) er
 	}
 }
 
+// writeWorker performs mutation operations on a fixed map.
+type writeWorker struct {
+	*mapWorker
+
+	operations uint64
+
+	// TODO(mhutchinson): Remove hammerState from here - it allows access to global info
+	// which makes reasoning about the behaviour difficult.
+	s *hammerState
+}
+
+func newWriteWorker(s *hammerState) *writeWorker {
+	return &writeWorker{
+		mapWorker: newWorker(s.cfg, rand.New(s.cfg.RandSource)),
+
+		operations: s.cfg.Operations,
+		s:          s,
+	}
+}
+
+func (w *writeWorker) loop(ctx context.Context, done <-chan struct{}) (uint64, error) {
+	count := uint64(0)
+
+	for ; count < w.operations; count++ {
+		select {
+		case <-done:
+			return count, nil
+		default:
+		}
+		if err := w.retryOneOp(ctx, w.s); err != nil {
+			return count, err
+		}
+	}
+	return count, nil
+}
+
 // hammerState tracks the operations that have been performed during a test run.
 type hammerState struct {
 	cfg            *MapConfig
@@ -394,24 +430,6 @@ func newHammerState(ctx context.Context, cfg *MapConfig) (*hammerState, error) {
 		validReadOps:   &validReadOps,
 		invalidReadOps: &invalidReadOps,
 	}, nil
-}
-
-// TODO(mhutchinson): Remove hammerState from here - it allows access to global info
-// which makes reasoning about the behaviour difficult.
-func (w *mapWorker) performOperations(ctx context.Context, done <-chan struct{}, s *hammerState) (uint64, error) {
-	count := uint64(0)
-
-	for ; count < s.cfg.Operations; count++ {
-		select {
-		case <-done:
-			return count, nil
-		default:
-		}
-		if err := w.retryOneOp(ctx, s); err != nil {
-			return count, err
-		}
-	}
-	return count, nil
 }
 
 func (s *hammerState) nextKey() string {
