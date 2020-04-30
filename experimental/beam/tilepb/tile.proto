@@ -1,0 +1,43 @@
+syntax = "proto3";
+
+package tilepb;
+
+option go_package = "tilepb";
+
+message MapTile {
+  // This a big detour from the Tile indexing system. Maybe forcing Tile &
+  // MapTile to be the same thing is not helpful?
+  bytes index = 1;
+
+  // Number of levels between root and leaves of this tile.
+  int32 tile_levels = 2;
+
+  // Values
+  bytes root = 3;
+  repeated TileLeaf leaves = 4;
+}
+
+message TileLeaf {
+  // The path from the root of this tile to this leaf.
+  // If missing then this tile directly follows from the previous leaf.
+  bytes path = 1;
+  // The hash of the value being committed to.
+  bytes value = 2;
+  // Raw data attached to this leaf. This is optional. If provided then it
+  // will be small and should be commited to be `value`, though this is up
+  // to the personality to arrange.
+  bytes data = 3;
+}
+
+message MapEntry {
+  // Output of SHA256 that identifies this key.
+  bytes key = 1;
+  // Output of SHA256 that is the hash of the value to be stored.
+  bytes value = 2;
+  // Raw data that can be attached to the leaf. This should be committed to
+  // by `value`, and should be short. It will be available via the `data`
+  // field of TileLeaf in the output tiles. This is a convenience for
+  // personalities that commit to very small values and where running a CAS
+  // to lookup the value would be overkill.
+  bytes data = 3;
+}
