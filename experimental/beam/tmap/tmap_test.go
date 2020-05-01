@@ -19,73 +19,66 @@ const hash = crypto.SHA512_256
 
 func TestDeNovo(t *testing.T) {
 	tests := []struct {
-		strata  []int
-		entries []*tilepb.MapEntry
-		treeID  int64
-		hash    crypto.Hash
-		root    string
+		prefixStrata int
+		entries      []*tilepb.MapEntry
+		treeID       int64
+		hash         crypto.Hash
+		root         string
 
 		expectFailConstruct bool
 		expectFailRun       bool
 	}{
 		{
-			strata:  []int{256},
-			entries: []*tilepb.MapEntry{createEntry("ak", "av")},
-			treeID:  12345,
-			hash:    crypto.SHA512_256,
-			root:    "af079c268bd48eb89532b2b0c96d753c8f98eb8ce03f5dd95fa60ab9cc92f3a4",
+			prefixStrata: 0,
+			entries:      []*tilepb.MapEntry{createEntry("ak", "av")},
+			treeID:       12345,
+			hash:         crypto.SHA512_256,
+			root:         "af079c268bd48eb89532b2b0c96d753c8f98eb8ce03f5dd95fa60ab9cc92f3a4",
 		},
 		{
-			strata:  []int{256},
-			entries: []*tilepb.MapEntry{createEntry("ak", "av")},
-			treeID:  54321,
-			hash:    crypto.SHA512_256,
-			root:    "8e6363380169b790b6e3d1890fc3d492a73512d9bbbfb886854e10ca10fc147f",
+			prefixStrata: 0,
+			entries:      []*tilepb.MapEntry{createEntry("ak", "av")},
+			treeID:       54321,
+			hash:         crypto.SHA512_256,
+			root:         "8e6363380169b790b6e3d1890fc3d492a73512d9bbbfb886854e10ca10fc147f",
 		},
 		{
-			strata:  []int{128, 128},
-			entries: []*tilepb.MapEntry{createEntry("ak", "av")},
-			treeID:  12345,
-			hash:    crypto.SHA512_256,
-			root:    "af079c268bd48eb89532b2b0c96d753c8f98eb8ce03f5dd95fa60ab9cc92f3a4",
+			prefixStrata: 1,
+			entries:      []*tilepb.MapEntry{createEntry("ak", "av")},
+			treeID:       12345,
+			hash:         crypto.SHA512_256,
+			root:         "af079c268bd48eb89532b2b0c96d753c8f98eb8ce03f5dd95fa60ab9cc92f3a4",
 		},
 		{
-			strata:  []int{256},
-			entries: []*tilepb.MapEntry{createEntry("ak", "av"), createEntry("bk", "bv"), createEntry("ck", "cv")},
-			treeID:  12345,
-			hash:    crypto.SHA512_256,
-			root:    "2372f0432e04dc76015f427ce8a1294644e36421b047ddfd52afdfdba60aff25",
+			prefixStrata: 0,
+			entries:      []*tilepb.MapEntry{createEntry("ak", "av"), createEntry("bk", "bv"), createEntry("ck", "cv")},
+			treeID:       12345,
+			hash:         crypto.SHA512_256,
+			root:         "2372f0432e04dc76015f427ce8a1294644e36421b047ddfd52afdfdba60aff25",
 		},
 		{
-			strata:  []int{128, 128},
-			entries: []*tilepb.MapEntry{createEntry("ak", "av"), createEntry("bk", "bv"), createEntry("ck", "cv")},
-			treeID:  12345,
-			hash:    crypto.SHA512_256,
-			root:    "2372f0432e04dc76015f427ce8a1294644e36421b047ddfd52afdfdba60aff25",
+			prefixStrata: 1,
+			entries:      []*tilepb.MapEntry{createEntry("ak", "av"), createEntry("bk", "bv"), createEntry("ck", "cv")},
+			treeID:       12345,
+			hash:         crypto.SHA512_256,
+			root:         "2372f0432e04dc76015f427ce8a1294644e36421b047ddfd52afdfdba60aff25",
 		},
 		{
-			strata:        []int{256},
+			prefixStrata:  0,
 			entries:       []*tilepb.MapEntry{createEntry("ak", "av"), createEntry("ak", "av")},
 			treeID:        12345,
 			hash:          crypto.SHA512_256,
 			expectFailRun: true,
 		},
 		{
-			strata:              []int{256, 256},
+			prefixStrata:        -1,
 			entries:             []*tilepb.MapEntry{createEntry("ak", "av")},
 			treeID:              12345,
 			hash:                crypto.SHA512_256,
 			expectFailConstruct: true,
 		},
 		{
-			strata:              []int{255, 1},
-			entries:             []*tilepb.MapEntry{createEntry("ak", "av")},
-			treeID:              12345,
-			hash:                crypto.SHA512_256,
-			expectFailConstruct: true,
-		},
-		{
-			strata:              []int{256, -8, 8},
+			prefixStrata:        32,
 			entries:             []*tilepb.MapEntry{createEntry("ak", "av")},
 			treeID:              12345,
 			hash:                crypto.SHA512_256,
@@ -100,7 +93,7 @@ func TestDeNovo(t *testing.T) {
 			p, s := beam.NewPipelineWithRoot()
 			leaves := beam.CreateList(s, test.entries)
 
-			tiles, err := DeNovo(s, leaves, test.treeID, test.hash, test.strata)
+			tiles, err := DeNovo(s, leaves, test.treeID, test.hash, test.prefixStrata)
 			if got, want := err != nil, test.expectFailConstruct; got != want {
 				t.Errorf("pipeline construction failure: got %v, want %v (%v)", got, want, err)
 			}
@@ -121,32 +114,32 @@ func TestDeNovo(t *testing.T) {
 
 func TestUpdateEmptyBase(t *testing.T) {
 	tests := []struct {
-		strata  []int
-		entries []*tilepb.MapEntry
-		root    string
+		prefixStrata int
+		entries      []*tilepb.MapEntry
+		root         string
 
 		expectFailConstruct bool
 		expectFailRun       bool
 	}{
 		{
-			strata:  []int{256},
-			entries: []*tilepb.MapEntry{createEntry("ak", "av")},
-			root:    "af079c268bd48eb89532b2b0c96d753c8f98eb8ce03f5dd95fa60ab9cc92f3a4",
+			prefixStrata: 0,
+			entries:      []*tilepb.MapEntry{createEntry("ak", "av")},
+			root:         "af079c268bd48eb89532b2b0c96d753c8f98eb8ce03f5dd95fa60ab9cc92f3a4",
 		},
 		{
-			strata:  []int{128, 128},
-			entries: []*tilepb.MapEntry{createEntry("ak", "av")},
-			root:    "af079c268bd48eb89532b2b0c96d753c8f98eb8ce03f5dd95fa60ab9cc92f3a4",
+			prefixStrata: 1,
+			entries:      []*tilepb.MapEntry{createEntry("ak", "av")},
+			root:         "af079c268bd48eb89532b2b0c96d753c8f98eb8ce03f5dd95fa60ab9cc92f3a4",
 		},
 		{
-			strata:  []int{256},
-			entries: []*tilepb.MapEntry{createEntry("ak", "av"), createEntry("bk", "bv"), createEntry("ck", "cv")},
-			root:    "2372f0432e04dc76015f427ce8a1294644e36421b047ddfd52afdfdba60aff25",
+			prefixStrata: 0,
+			entries:      []*tilepb.MapEntry{createEntry("ak", "av"), createEntry("bk", "bv"), createEntry("ck", "cv")},
+			root:         "2372f0432e04dc76015f427ce8a1294644e36421b047ddfd52afdfdba60aff25",
 		},
 		{
-			strata:  []int{128, 128},
-			entries: []*tilepb.MapEntry{createEntry("ak", "av"), createEntry("bk", "bv"), createEntry("ck", "cv")},
-			root:    "2372f0432e04dc76015f427ce8a1294644e36421b047ddfd52afdfdba60aff25",
+			prefixStrata: 1,
+			entries:      []*tilepb.MapEntry{createEntry("ak", "av"), createEntry("bk", "bv"), createEntry("ck", "cv")},
+			root:         "2372f0432e04dc76015f427ce8a1294644e36421b047ddfd52afdfdba60aff25",
 		},
 	}
 
@@ -158,10 +151,10 @@ func TestUpdateEmptyBase(t *testing.T) {
 
 			// This actually puts an invalid MapTile into the base PCollection because creating an
 			// empty PCollection seems impossible to cleanly do.
-			base := beam.CreateList(s, []*tilepb.MapTile{{Index: []byte{0xff}}})
+			base := beam.CreateList(s, []*tilepb.MapTile{{Index: []byte{0xff, 0xff}}})
 			delta := beam.CreateList(s, test.entries)
 
-			tiles, err := Update(s, base, delta, treeID, hash, test.strata)
+			tiles, err := Update(s, base, delta, treeID, hash, test.prefixStrata)
 			if got, want := err != nil, test.expectFailConstruct; got != want {
 				t.Errorf("pipeline construction failure: got %v, want %v (%v)", got, want, err)
 			}
@@ -182,30 +175,30 @@ func TestUpdateEmptyBase(t *testing.T) {
 
 func TestUpdate(t *testing.T) {
 	tests := []struct {
-		strata                     []int
+		prefixStrata               int
 		baseEntries, updateEntries []*tilepb.MapEntry
 		root                       string
 	}{
 		{
-			strata:        []int{256},
+			prefixStrata:  0,
 			baseEntries:   []*tilepb.MapEntry{createEntry("ak", "ignored")},
 			updateEntries: []*tilepb.MapEntry{createEntry("ak", "av")},
 			root:          "af079c268bd48eb89532b2b0c96d753c8f98eb8ce03f5dd95fa60ab9cc92f3a4",
 		},
 		{
-			strata:        []int{128, 128},
+			prefixStrata:  1,
 			baseEntries:   []*tilepb.MapEntry{createEntry("ak", "ignored")},
 			updateEntries: []*tilepb.MapEntry{createEntry("ak", "av")},
 			root:          "af079c268bd48eb89532b2b0c96d753c8f98eb8ce03f5dd95fa60ab9cc92f3a4",
 		},
 		{
-			strata:        []int{256},
+			prefixStrata:  0,
 			baseEntries:   []*tilepb.MapEntry{createEntry("ak", "ignored"), createEntry("bk", "bv")},
 			updateEntries: []*tilepb.MapEntry{createEntry("ak", "av"), createEntry("ck", "cv")},
 			root:          "2372f0432e04dc76015f427ce8a1294644e36421b047ddfd52afdfdba60aff25",
 		},
 		{
-			strata:        []int{128, 128},
+			prefixStrata:  1,
 			baseEntries:   []*tilepb.MapEntry{createEntry("ak", "ignored"), createEntry("bk", "bv")},
 			updateEntries: []*tilepb.MapEntry{createEntry("ak", "av"), createEntry("ck", "cv")},
 			root:          "2372f0432e04dc76015f427ce8a1294644e36421b047ddfd52afdfdba60aff25",
@@ -219,13 +212,13 @@ func TestUpdate(t *testing.T) {
 			p, s := beam.NewPipelineWithRoot()
 			leaves := beam.CreateList(s, test.baseEntries)
 
-			base, err := DeNovo(s, leaves, treeID, hash, test.strata)
+			base, err := DeNovo(s, leaves, treeID, hash, test.prefixStrata)
 			if err != nil {
 				t.Fatalf("failed to create pipeline: %v", err)
 			}
 
 			delta := beam.CreateList(s, test.updateEntries)
-			update, err := Update(s, base, delta, treeID, hash, test.strata)
+			update, err := Update(s, base, delta, treeID, hash, test.prefixStrata)
 			if err != nil {
 				t.Fatalf("failed to create pipeline: %v", err)
 			}
@@ -247,7 +240,7 @@ func TestChildrenSorted(t *testing.T) {
 		entries = append(entries, createEntry(fmt.Sprintf("key: %d", i), fmt.Sprintf("value: %d", i)))
 	}
 
-	tiles, err := DeNovo(s, beam.CreateList(s, entries), treeID, hash, []int{8, 248})
+	tiles, err := DeNovo(s, beam.CreateList(s, entries), treeID, hash, 1)
 	if err != nil {
 		t.Fatalf("failed to create pipeline: %v", err)
 	}
@@ -263,7 +256,7 @@ func TestGolden(t *testing.T) {
 	p, s := beam.NewPipelineWithRoot()
 	leaves := beam.CreateList(s, leafNodes(t, 500))
 
-	tiles, err := DeNovo(s, leaves, 42, crypto.SHA256, []int{8, 248})
+	tiles, err := DeNovo(s, leaves, 42, crypto.SHA256, 1)
 	if err != nil {
 		t.Fatalf("failed to create pipeline: %v", err)
 	}

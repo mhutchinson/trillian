@@ -22,22 +22,23 @@ func init() {
 // DeNovo creates a new map which is the result of converting
 // the input PCollection of *tilepb.MapEntry into a Merkle tree and tiling the result.
 // The output type is a PCollection of *tilepb.MapTile.
-// strata is the bit depth of each strata of tiles, starting from the root.
-func DeNovo(s beam.Scope, leaves beam.PCollection, treeID int64, hash crypto.Hash, strata []int) (beam.PCollection, error) {
-	s = s.Scope("CreateMap")
-	if err := validateStrata(strata); err != nil {
-		return beam.Impulse(s), err
+// prefixStrata is the number of 8-bit prefix strata. Any path from root to leaf will have $prefixStrata+1 tiles.
+func DeNovo(s beam.Scope, leaves beam.PCollection, treeID int64, hash crypto.Hash, prefixStrata int) (beam.PCollection, error) {
+	s = s.Scope("tmap.DeNovo")
+	if prefixStrata < 0 || prefixStrata >= 32 {
+		return beam.Impulse(s), fmt.Errorf("prefixStrata must be in [0, 32), got %d", prefixStrata)
 	}
 
-	si := len(strata) - 1
-	coordinateHeight := strata[si]
-	lShard, lAgg := createLeafFns(treeID, hash, strata[si])
+	// Construct the map pipeline starting with the leaf tile strata.
+	// coordinateHeight is the height of the root of the current strata being constructed.
+	coordinateHeight := 256 - (8 * prefixStrata)
+	lShard, lAgg := createLeafFns(treeID, hash, coordinateHeight)
 	lastStrata := beam.ParDo(s, lAgg, beam.GroupByKey(s, beam.ParDo(s, lShard, leaves)))
 	allTiles := []beam.PCollection{lastStrata}
-	si--
-	for ; si >= 0; si-- {
-		coordinateHeight += strata[si]
-		tShard, tAgg := createTileFns(treeID, hash, strata[si], coordinateHeight)
+	for i := 0; i < prefixStrata; i++ {
+		coordinateHeight += 8
+		// TODO(mhutchinson): Convert all units to bytes in this class; bits should go away.
+		tShard, tAgg := createTileFns(treeID, hash, 8, coordinateHeight)
 		lastStrata = beam.ParDo(s, tAgg, beam.GroupByKey(s, beam.ParDo(s, tShard, lastStrata)))
 		allTiles = append(allTiles, lastStrata)
 	}
@@ -49,24 +50,24 @@ func DeNovo(s beam.Scope, leaves beam.PCollection, treeID int64, hash crypto.Has
 // Update takes an existing base map (PCollection<*tilepb.MapTile>), applies the
 // delta (PCollection<*tilepb.MapEntry>) and returns the tiled map (PCollection<*tilepb.MapTile>).
 // The treeID & strata of the base map must match the scheme passed in, or things will break. Horribly.
-func Update(s beam.Scope, base, delta beam.PCollection, treeID int64, hash crypto.Hash, strata []int) (beam.PCollection, error) {
-	s = s.Scope("UpdateMap")
-	if err := validateStrata(strata); err != nil {
-		return beam.Impulse(s), err
+func Update(s beam.Scope, base, delta beam.PCollection, treeID int64, hash crypto.Hash, prefixStrata int) (beam.PCollection, error) {
+	s = s.Scope("tmap.Update")
+	if prefixStrata < 0 || prefixStrata >= 32 {
+		return beam.Impulse(s), fmt.Errorf("prefixStrata must be in [0, 32), got %d", prefixStrata)
 	}
 
-	si := len(strata) - 1
-	coordinateHeight := strata[si]
+	// Construct the map pipeline starting with the leaf tile strata.
+	// coordinateHeight is the height of the root of the current strata being constructed.
+	coordinateHeight := 256 - (8 * prefixStrata)
 	shardedLeafBase := beam.ParDo(s, &BaseTileSharder{(256 - coordinateHeight) / 8}, base)
 	shardedLeafDelta := beam.ParDo(s, &LeafShardFn{uint(256 - coordinateHeight)}, delta)
 	lastStrata := beam.ParDo(s, &LeafTileUpdateFn{TreeID: treeID, Hash: hash, HeightBytes: coordinateHeight / 8}, beam.CoGroupByKey(s, shardedLeafBase, shardedLeafDelta))
 	allTiles := []beam.PCollection{lastStrata}
-	si--
-	for ; si >= 0; si-- {
-		coordinateHeight += strata[si]
+	for i := 0; i < prefixStrata; i++ {
+		coordinateHeight += 8
 		shardedTileBase := beam.ParDo(s, &BaseTileSharder{(256 - coordinateHeight) / 8}, base)
 		shardedTileDelta := beam.ParDo(s, &TileShardFn{uint(256 - coordinateHeight)}, lastStrata)
-		lastStrata = beam.ParDo(s, &UpperTileUpdateFn{TreeID: treeID, Hash: hash, HeightBytes: strata[si] / 8, RootHeight: coordinateHeight}, beam.CoGroupByKey(s, shardedTileBase, shardedTileDelta))
+		lastStrata = beam.ParDo(s, &UpperTileUpdateFn{TreeID: treeID, Hash: hash, HeightBytes: 1, RootHeight: coordinateHeight}, beam.CoGroupByKey(s, shardedTileBase, shardedTileDelta))
 		allTiles = append(allTiles, lastStrata)
 	}
 
@@ -88,23 +89,6 @@ func CreateEntry(key, rawData []byte, treeID int64) *tilepb.MapEntry {
 		Value: vbs,
 		Data:  rawData,
 	}
-}
-
-func validateStrata(strata []int) error {
-	d := 0
-	for _, s := range strata {
-		if s%8 != 0 {
-			return fmt.Errorf("Strata depths not aligned with bytes not supported. Got depth: %d", s)
-		}
-		if s < 0 {
-			return fmt.Errorf("Strata depths cannot be negative. Got: %d", s)
-		}
-		d += s
-	}
-	if d != 256 {
-		return fmt.Errorf("Total tree depth must be 256, got %d", d)
-	}
-	return nil
 }
 
 func createLeafFns(treeID int64, hash crypto.Hash, tileHeightBits int) (*LeafShardFn, *LeafAggregatorFn) {
