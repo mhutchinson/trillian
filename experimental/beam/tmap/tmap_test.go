@@ -17,6 +17,10 @@ import (
 const treeID = int64(12345)
 const hash = crypto.SHA512_256
 
+func TestMain(m *testing.M) {
+	ptest.Main(m)
+}
+
 func TestDeNovo(t *testing.T) {
 	tests := []struct {
 		prefixStrata int

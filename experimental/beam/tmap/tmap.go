@@ -66,7 +66,7 @@ func Update(s beam.Scope, base, delta beam.PCollection, treeID int64, hash crypt
 	for i := 0; i < prefixStrata; i++ {
 		coordinateHeight += 8
 		shardedTileBase := beam.ParDo(s, &BaseTileSharder{(256 - coordinateHeight) / 8}, base)
-		shardedTileDelta := beam.ParDo(s, &TileShardFn{uint(256 - coordinateHeight)}, lastStrata)
+		shardedTileDelta := beam.ParDo(s, &PrefixTilePrepareFn{uint(256 - coordinateHeight)}, lastStrata)
 		lastStrata = beam.ParDo(s, &UpperTileUpdateFn{TreeID: treeID, Hash: hash, HeightBytes: 1, RootHeight: coordinateHeight}, beam.CoGroupByKey(s, shardedTileBase, shardedTileDelta))
 		allTiles = append(allTiles, lastStrata)
 	}
@@ -95,21 +95,26 @@ func createLeafFns(treeID int64, hash crypto.Hash, tileHeightBits int) (*LeafSha
 	return &LeafShardFn{uint(256 - tileHeightBits)}, &LeafAggregatorFn{TreeID: treeID, Hash: hash, HeightBytes: tileHeightBits / 8}
 }
 
-func createTileFns(treeID int64, hash crypto.Hash, tileHeightBits, coordinateHeightBits int) (*TileShardFn, *TileAggregatorFn) {
-	return &TileShardFn{uint(256 - coordinateHeightBits)}, &TileAggregatorFn{TreeID: treeID, Hash: hash, HeightBytes: tileHeightBits / 8, RootHeight: coordinateHeightBits}
+func createTileFns(treeID int64, hash crypto.Hash, tileHeightBits, coordinateHeightBits int) (*PrefixTilePrepareFn, *PrefixTileConstructFn) {
+	return &PrefixTilePrepareFn{uint(256 - coordinateHeightBits)}, &PrefixTileConstructFn{TreeID: treeID, Hash: hash, HeightBytes: tileHeightBits / 8, RootHeight: coordinateHeightBits}
 }
 
-type TileShardFn struct {
+// PrefixTilePrepareFn takes the computed tiles from a lower layer of the tree and outputs
+// the information required from them to be seen as leaves in the next layer of the tree,
+// keyed by the ID of the root of this upper layer.
+type PrefixTilePrepareFn struct {
 	// The depth of the root of this tile from the root of the tree.
-	RootDepth uint
+	rootDepth uint
 }
 
-func (fn *TileShardFn) ProcessElement(t *tilepb.MapTile) (tree.NodeID2, *tilepb.MapTile) {
-	p := t.GetIndex()
-	return tree.NewNodeID2(string(p), fn.RootDepth), t
+func (fn *PrefixTilePrepareFn) ProcessElement(t *tilepb.MapTile) (tree.NodeID2, TileRoot) {
+	l := TileRoot{t.GetIndex(), t.GetRoot()}
+	return tree.NewNodeID2(string(t.GetIndex()), fn.rootDepth), l
 }
 
-type TileAggregatorFn struct {
+// PrefixTileConstructFn takes the grouped leaves created by PrefixTilePrepareFn and constructs the tile
+// from the leaves in the group.
+type PrefixTileConstructFn struct {
 	HeightBytes int
 	// The height of the root of this tile above the lowest level of the tree. This is bits, not bytes.
 	RootHeight int
@@ -118,19 +123,19 @@ type TileAggregatorFn struct {
 	th         *tileHasher
 }
 
-func (fn *TileAggregatorFn) Setup() {
+func (fn *PrefixTileConstructFn) Setup() {
 	fn.th = &tileHasher{fn.TreeID, coniks.New(fn.Hash)}
 }
 
-func (fn *TileAggregatorFn) ProcessElement(root tree.NodeID2, leaves func(**tilepb.MapTile) bool) (*tilepb.MapTile, error) {
+func (fn *PrefixTileConstructFn) ProcessElement(root tree.NodeID2, leaves func(*TileRoot) bool) (*tilepb.MapTile, error) {
 	m := make(map[tree.NodeID2]leafValue)
-	var leaf *tilepb.MapTile
+	var leaf TileRoot
 	for leaves(&leaf) {
-		lidx := tree.NewNodeID2(string(leaf.GetIndex()), root.BitLen()+8*uint(fn.HeightBytes))
+		lidx := tree.NewNodeID2(string(leaf.Index), root.BitLen()+8*uint(fn.HeightBytes))
 		if v, found := m[lidx]; found {
-			return nil, fmt.Errorf("Found duplicate values at tile position %s: {%x, %x}", lidx, v, leaf.GetRoot())
+			return nil, fmt.Errorf("Found duplicate values at tile position %s: {%x, %x}", lidx, v, leaf.Index)
 		}
-		m[lidx] = leafValue{leaf.GetRoot(), nil}
+		m[lidx] = leafValue{leaf.RootHash, nil}
 	}
 
 	return fn.th.createTile(8*fn.HeightBytes, root, m)
@@ -203,7 +208,7 @@ func (fn *UpperTileUpdateFn) Setup() {
 	fn.th = &tileHasher{fn.TreeID, coniks.New(fn.Hash)}
 }
 
-func (fn *UpperTileUpdateFn) ProcessElement(root tree.NodeID2, bases func(**tilepb.MapTile) bool, leaves func(**tilepb.MapTile) bool) (*tilepb.MapTile, error) {
+func (fn *UpperTileUpdateFn) ProcessElement(root tree.NodeID2, bases func(**tilepb.MapTile) bool, leaves func(*TileRoot) bool) (*tilepb.MapTile, error) {
 	base, err := getZeroOrOne(bases)
 	if err != nil {
 		return nil, fmt.Errorf("Error at location %s: %v", root, err)
@@ -227,10 +232,10 @@ func (fn *UpperTileUpdateFn) ProcessElement(root tree.NodeID2, bases func(**tile
 	}
 
 	// 2. Write and new values into the map, overwriting any stale entries.
-	var leaf *tilepb.MapTile
+	var leaf TileRoot
 	for leaves(&leaf) {
-		lidx := tree.NewNodeID2(string(leaf.GetIndex()), root.BitLen()+8*uint(fn.HeightBytes))
-		m[lidx] = leafValue{leaf.GetRoot(), nil}
+		lidx := tree.NewNodeID2(string(leaf.Index), root.BitLen()+8*uint(fn.HeightBytes))
+		m[lidx] = leafValue{leaf.RootHash, nil}
 	}
 	return fn.th.createTile(8*fn.HeightBytes, root, m)
 }
@@ -419,4 +424,8 @@ func nodeID2Encode(n tree.NodeID2) ([]byte, error) {
 
 func nodeID2Decode(bs []byte) (tree.NodeID2, error) {
 	return tree.NewNodeID2(string(bs), 8*uint(len(bs))), nil
+}
+
+type TileRoot struct {
+	Index, RootHash []byte
 }
