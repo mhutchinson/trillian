@@ -1,5 +1,8 @@
 FROM python:3.8-buster
 
+RUN apt-get update ; \
+    apt-get install -y socat
+
 RUN python -m pip install --upgrade pip
 RUN pip install apache-beam[gcp,test]
 
