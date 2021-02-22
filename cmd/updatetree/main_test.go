@@ -18,6 +18,9 @@ import (
 	"context"
 	"errors"
 	"flag"
+	"fmt"
+	"os"
+	"runtime/debug"
 	"testing"
 	"time"
 
@@ -35,6 +38,16 @@ type testCase struct {
 	updateTree *trillian.Tree
 	wantErr    bool
 	wantState  trillian.TreeState
+}
+
+func TestMain(m *testing.M) {
+    defer func() {
+        if r := recover(); r != nil {
+            fmt.Println("stacktrace from panic: \n" + string(debug.Stack()))
+        }
+    }()
+    code := m.Run()
+    os.Exit(code)
 }
 
 func TestFreezeTree(t *testing.T) {
