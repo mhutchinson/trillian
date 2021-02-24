@@ -17,6 +17,9 @@ package der_test
 import (
 	"bytes"
 	"encoding/base64"
+	"fmt"
+	"os"
+	"runtime/debug"
 	"testing"
 
 	. "github.com/google/trillian/crypto/keys/der"
@@ -30,6 +33,16 @@ const (
 	// ECDSA public key in DER format, base64-encoded.
 	pubKeyBase64 = "MFkwEwYHKoZIzj0CAQYIKoZIzj0DAQcDQgAEsAVg3YB0tOFf3DdC2YHPL2WiuCNR1iywqGjjtu2dAdWktWqgRO4NTqPJXUggSQL3nvOupHB4WZFZ4j3QhtmWRg=="
 )
+
+func TestMain(m *testing.M) {
+	defer func() {
+		if r := recover(); r != nil {
+			fmt.Println("stacktrace from panic: \n" + string(debug.Stack()))
+		}
+	}()
+	code := m.Run()
+	os.Exit(code)
+}
 
 func TestFromProto(t *testing.T) {
 	t.Parallel()
