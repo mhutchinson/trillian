@@ -20,7 +20,7 @@ require (
 	github.com/google/certificate-transparency-go v1.0.21
 	github.com/google/go-cmp v0.5.5
 	github.com/google/go-licenses v0.0.0-20210329231322-ce1d9163b77d
-	github.com/grpc-ecosystem/go-grpc-middleware v1.2.2
+	github.com/grpc-ecosystem/go-grpc-middleware v1.3.0
 	github.com/huandu/xstrings v1.2.0 // indirect
 	github.com/letsencrypt/pkcs11key/v4 v4.0.0
 	github.com/miekg/pkcs11 v1.0.3 // indirect
