@@ -22,18 +22,18 @@ require (
 	github.com/prometheus/client_golang v1.10.0
 	github.com/prometheus/client_model v0.2.0
 	github.com/pseudomuto/protoc-gen-doc v1.4.1
-	go.etcd.io/etcd/client/v3 v3.5.0-alpha.0
-	go.etcd.io/etcd/etcdctl/v3 v3.5.0-alpha.0
-	go.etcd.io/etcd/server/v3 v3.5.0-alpha.0
-	go.etcd.io/etcd/v3 v3.5.0-alpha.0
+	go.etcd.io/etcd/client/v3 v3.5.0-rc.0
+	go.etcd.io/etcd/etcdctl/v3 v3.5.0-rc.0
+	go.etcd.io/etcd/server/v3 v3.5.0-rc.0
+	go.etcd.io/etcd/v3 v3.5.0-rc.0
 	go.opencensus.io v0.23.0
 	golang.org/x/crypto v0.0.0-20201002170205-7f63de1d35b0
 	golang.org/x/sync v0.0.0-20210220032951-036812b2e83c
 	golang.org/x/sys v0.0.0-20210510120138-977fb7262007
-	golang.org/x/tools v0.1.1
+	golang.org/x/tools v0.1.2
 	google.golang.org/api v0.46.0
-	google.golang.org/genproto v0.0.0-20210429181445-86c259c2b4ab
-	google.golang.org/grpc v1.37.0
+	google.golang.org/genproto v0.0.0-20210602131652-f16073e35f0c
+	google.golang.org/grpc v1.38.0
 	google.golang.org/grpc/cmd/protoc-gen-go-grpc v1.1.0
 	google.golang.org/protobuf v1.26.0
 )
