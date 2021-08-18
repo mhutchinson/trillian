@@ -20,8 +20,8 @@ import (
 
 	"github.com/google/trillian"
 	"github.com/google/trillian/merkle"
-	"github.com/google/trillian/merkle/compact"
-	"github.com/google/trillian/merkle/hashers"
+	"github.com/mhutchinson/trillian-libs/merkle/compact"
+	"github.com/mhutchinson/trillian-libs/merkle/hashers"
 	"github.com/google/trillian/storage/tree"
 )
 

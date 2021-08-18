@@ -18,8 +18,8 @@ import (
 	"encoding/binary"
 	"fmt"
 
-	"github.com/google/trillian/merkle/compact"
-	"github.com/google/trillian/merkle/hashers"
+	"github.com/mhutchinson/trillian-libs/merkle/compact"
+	"github.com/mhutchinson/trillian-libs/merkle/hashers"
 	"github.com/google/trillian/storage/storagepb"
 )
 

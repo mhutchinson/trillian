@@ -28,8 +28,8 @@ import (
 
 	"github.com/golang/glog"
 	"github.com/google/trillian"
-	"github.com/google/trillian/merkle/compact"
-	"github.com/google/trillian/merkle/rfc6962"
+	"github.com/mhutchinson/trillian-libs/merkle/compact"
+	"github.com/mhutchinson/trillian-libs/merkle/rfc6962"
 	"github.com/google/trillian/storage"
 	"github.com/google/trillian/storage/testdb"
 	storageto "github.com/google/trillian/storage/testonly"

@@ -34,7 +34,7 @@ import (
 	"errors"
 	"fmt"
 
-	"github.com/google/trillian/merkle/hashers"
+	"github.com/mhutchinson/trillian-libs/merkle/hashers"
 )
 
 // TreeEntry is used for nodes in the tree for better readability. Just holds a hash but could be extended

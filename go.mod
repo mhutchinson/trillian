@@ -19,6 +19,7 @@ require (
 	github.com/google/go-licenses v0.0.0-20210329231322-ce1d9163b77d
 	github.com/grpc-ecosystem/go-grpc-middleware v1.3.0
 	github.com/letsencrypt/pkcs11key/v4 v4.0.0
+	github.com/mhutchinson/trillian-libs/merkle v0.0.0-00010101000000-000000000000 // indirect
 	github.com/prometheus/client_golang v1.11.0
 	github.com/prometheus/client_model v0.2.0
 	github.com/pseudomuto/protoc-gen-doc v1.4.1
@@ -37,3 +38,5 @@ require (
 	google.golang.org/grpc/cmd/protoc-gen-go-grpc v1.1.0
 	google.golang.org/protobuf v1.27.1
 )
+
+replace github.com/mhutchinson/trillian-libs/merkle => ../trillian-libs/merkle

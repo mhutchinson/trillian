@@ -20,8 +20,8 @@ import (
 	"fmt"
 	"sync"
 
-	"github.com/google/trillian/merkle/compact"
-	"github.com/google/trillian/merkle/hashers"
+	"github.com/mhutchinson/trillian-libs/merkle/compact"
+	"github.com/mhutchinson/trillian-libs/merkle/hashers"
 	"github.com/google/trillian/storage/storagepb"
 	"github.com/google/trillian/storage/tree"
 	"google.golang.org/protobuf/proto"

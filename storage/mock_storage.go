@@ -11,7 +11,7 @@ import (
 
 	gomock "github.com/golang/mock/gomock"
 	trillian "github.com/google/trillian"
-	compact "github.com/google/trillian/merkle/compact"
+	compact "github.com/mhutchinson/trillian-libs/merkle/compact"
 	tree "github.com/google/trillian/storage/tree"
 )
 

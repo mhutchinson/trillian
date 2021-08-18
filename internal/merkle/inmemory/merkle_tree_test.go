@@ -23,8 +23,8 @@ import (
 	"testing"
 
 	_ "github.com/golang/glog"
-	"github.com/google/trillian/merkle/hashers"
-	"github.com/google/trillian/merkle/rfc6962"
+	"github.com/mhutchinson/trillian-libs/merkle/hashers"
+	"github.com/mhutchinson/trillian-libs/merkle/rfc6962"
 )
 
 // Note test inputs came from the values used by the C++ code. The original

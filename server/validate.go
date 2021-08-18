@@ -18,7 +18,7 @@ import (
 	"fmt"
 
 	"github.com/google/trillian"
-	"github.com/google/trillian/merkle/hashers"
+	"github.com/mhutchinson/trillian-libs/merkle/hashers"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
 )

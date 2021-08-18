@@ -3,6 +3,8 @@
 ## HEAD
 
 * GCP terraform script updated. GKE 1.19 and updated CPU type to E2
+* Extracted merkle stuff into a separate repository
+  * TODO(mhutchinson): link to this. Consider making backwards compat.
 
 ### Dependency updates
  * Upgraded to etcd v3 in order to allow grpc to be upgraded (#2195)
