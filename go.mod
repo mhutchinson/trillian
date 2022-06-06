@@ -15,7 +15,7 @@ require (
 	github.com/golang/glog v0.0.0-20160126235308-23def4e6c14b
 	github.com/golang/mock v1.6.0
 	github.com/golang/protobuf v1.5.2
-	github.com/google/btree v1.0.1
+	github.com/google/btree v1.1.1
 	github.com/google/certificate-transparency-go v1.1.2-0.20210512142713-bed466244fa6
 	github.com/google/go-cmp v0.5.7
 	github.com/google/go-licenses v0.0.0-20210329231322-ce1d9163b77d
