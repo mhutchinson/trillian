@@ -6,13 +6,13 @@ require (
 	bitbucket.org/creachadair/shell v0.0.7
 	cloud.google.com/go/iam v0.1.1 // indirect
 	cloud.google.com/go/spanner v1.31.0
-	contrib.go.opencensus.io/exporter/stackdriver v0.13.11
+	contrib.go.opencensus.io/exporter/stackdriver v0.13.13
 	github.com/apache/beam/sdks/v2 v2.0.0-20211012030016-ef4364519c94
 	github.com/form3tech-oss/jwt-go v3.2.5+incompatible // indirect
 	github.com/fullstorydev/grpcurl v1.8.6
 	github.com/go-redis/redis v6.15.9+incompatible
 	github.com/go-sql-driver/mysql v1.6.0
-	github.com/golang/glog v0.0.0-20160126235308-23def4e6c14b
+	github.com/golang/glog v1.0.0
 	github.com/golang/mock v1.6.0
 	github.com/golang/protobuf v1.5.2
 	github.com/google/btree v1.0.1
@@ -25,10 +25,8 @@ require (
 	github.com/mattn/go-runewidth v0.0.13 // indirect
 	github.com/prometheus/client_golang v1.12.1
 	github.com/prometheus/client_model v0.2.0
-	github.com/prometheus/common v0.34.0 // indirect
 	github.com/pseudomuto/protoc-gen-doc v1.5.1
 	github.com/spf13/cobra v1.4.0 // indirect
-	github.com/stretchr/testify v1.7.1 // indirect
 	github.com/transparency-dev/merkle v0.0.0-20220425113829-c120179f55ad
 	github.com/urfave/cli v1.22.7 // indirect
 	go.etcd.io/etcd/client/v3 v3.5.4
@@ -37,7 +35,7 @@ require (
 	go.etcd.io/etcd/v3 v3.5.4
 	go.opencensus.io v0.23.0
 	go.opentelemetry.io/contrib v1.6.0 // indirect
-	go.uber.org/atomic v1.9.0 // indirect
+	go.opentelemetry.io/otel/internal/metric v0.27.0 // indirect
 	go.uber.org/multierr v1.8.0 // indirect
 	go.uber.org/zap v1.21.0 // indirect
 	golang.org/x/crypto v0.0.0-20220411220226-7b82a4e95df4
