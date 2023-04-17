@@ -19,6 +19,7 @@ import (
 	"time"
 
 	"github.com/google/trillian"
+	"github.com/google/trillian/storage/storagepb"
 	"github.com/google/trillian/storage/tree"
 	"github.com/transparency-dev/merkle/compact"
 	"google.golang.org/grpc/codes"
@@ -57,6 +58,13 @@ type ReadOnlyLogTreeTX interface {
 	GetLeavesByHash(ctx context.Context, leafHashes [][]byte, orderBySequence bool) ([]*trillian.LogLeaf, error)
 	// LatestSignedLogRoot returns the most recent SignedLogRoot, if any.
 	LatestSignedLogRoot(ctx context.Context) (*trillian.SignedLogRoot, error)
+}
+
+// TileReadTx allows tiles to be read directly from storage if the underlying storage type
+// supports these operations.
+type TileReadTx interface {
+	ReadOnlyLogTreeTX
+	GetSubtrees(ctx context.Context, ids [][]byte) ([]*storagepb.SubtreeProto, error)
 }
 
 // LogTreeTX is the transactional interface for reading/updating a Log.

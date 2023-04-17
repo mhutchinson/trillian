@@ -29,6 +29,7 @@ import (
 	"github.com/google/trillian/monitoring"
 	"github.com/google/trillian/storage"
 	"github.com/google/trillian/storage/cache"
+	"github.com/google/trillian/storage/storagepb"
 	"github.com/google/trillian/storage/tree"
 	"github.com/google/trillian/types"
 	"github.com/transparency-dev/merkle/compact"
@@ -298,6 +299,10 @@ type logTreeTX struct {
 	readRev  int64
 	slr      *trillian.SignedLogRoot
 	dequeued map[string]dequeuedLeaf
+}
+
+func (t *logTreeTX) GetSubtrees(ctx context.Context, ids [][]byte) ([]*storagepb.SubtreeProto, error) {
+	return t.getSubtrees(ctx, t.readRev, ids)
 }
 
 // GetMerkleNodes returns the requested nodes at the read revision.
