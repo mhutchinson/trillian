@@ -1,4 +1,4 @@
-<-- This content generated with:
+<!--- This content generated with:
 go run github.com/google/trillian/docs/claimantmodel/experimental/cmd/render@master --full_model_file ./cmd/render/internal/models/armorydrive/full.yaml
 -->
 ```mermaid
