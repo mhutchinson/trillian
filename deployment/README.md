@@ -16,7 +16,7 @@ Further deployment types (community-supported) can be found in the
 The infrastructure is created using Terraform. It consists of a Cloud Spanner
 database, a Trillian-specific etcd cluster, the Trillian logserver and
 logsigner. A Workload Identity is set up by Terraform to give the services access
-to Cloud Spanner. The container images are based on v1.3.3.
+to Cloud Spanner. The container images are based on v1.6.0.
 
 ## Prerequisites
 1. [Terraform](https://www.terraform.io/), [kubectl](https://kubernetes.io/docs/tasks/tools/install-kubectl/),
@@ -29,6 +29,7 @@ to Cloud Spanner. The container images are based on v1.3.3.
 1. Create a new project and copy its [Project
    ID](https://cloud.google.com/resource-manager/docs/creating-managing-projects#identifying_projects).
 1. Create the infrastructure: `terraform init && terraform apply -var="gcp_project=PROJECT_ID"`.
+   If this is a temporary instance, add `--var="deletion_protection=false` to allow destroy to fully remove everything.
    It is ok to re-execute this command at any time.
 1. The script will output a gcloud command similar to:
    ```shell

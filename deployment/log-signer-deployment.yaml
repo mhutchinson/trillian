@@ -35,7 +35,7 @@ spec:
         envFrom:
         - configMapRef:
             name: deploy-config
-        image: gcr.io/trillian-opensource-ci/log_signer:v1.3.3
+        image: gcr.io/trillian-opensource-ci/log_signer:v1.6.0
         imagePullPolicy: Always
         resources:
           limits:
